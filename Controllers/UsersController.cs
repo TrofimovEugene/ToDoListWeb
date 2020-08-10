@@ -4,7 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -26,14 +26,15 @@ namespace ToDoListWeb.Controllers
 
         // GET: api/Users
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetUser()
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
             return await _context.User.ToListAsync();
         }
 
         // GET: api/Users/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUser(int id)
+        public async Task<ActionResult<User>> GetUserById(int id)
         {
             var user = await _context.User.FindAsync(id);
 
@@ -46,10 +47,15 @@ namespace ToDoListWeb.Controllers
         }
 
         // PUT: api/Users/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
+        /// <summary>
+        /// Редактирование информации о пользователе.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="user"></param>
+        /// <returns></returns>
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutUser(int id, User user)
+        [Authorize]
+        public async Task<IActionResult> EditingUserInformation(int id, User user)
         {
             if (id != user.Id)
             {
@@ -78,19 +84,32 @@ namespace ToDoListWeb.Controllers
         }
 
         // POST: api/Users
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
+        /// <summary>
+        /// Функция регистрации пользователя в системе.
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>
+        /// Возвращает JSON c данными зарегистрированного пользователя в системе.
+        /// </returns>
         [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
+        public async Task<ActionResult<User>> RegisterUser(User user)
         {
             _context.User.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetUser", new { id = user.Id }, user);
+            return CreatedAtAction("GetUserById", new { id = user.Id }, user);
         }
 
         // DELETE: api/Users/5
+        /// <summary>
+        /// Удаление пользователя из системы
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns>
+        /// Возвращает JSON c данными удалённого пользователя.
+        /// </returns>
         [HttpDelete("{id}")]
+        //[Authorize(Roles = "admin")]
         public async Task<ActionResult<User>> DeleteUser(int id)
         {
             var user = await _context.User.FindAsync(id);
@@ -105,17 +124,23 @@ namespace ToDoListWeb.Controllers
             return user;
         }
 
-        public class Response
+        public new class Request
+		{
+            public string Email { get; set; }
+            public string Password { get; set; }
+		}
+
+        public new class Response
         {
-	        public string access_token { get; set; }
-	        public string username { get; set; }
-	        public int idStudent { get; set; }
+	        public string AccessToken { get; set; }
+	        public string Email { get; set; }
+	        public int IdUser { get; set; }
         }
 
-        [HttpPost("UserToken")]
-        public async Task<ActionResult<Response>> StudentToken(string email, string password)
+        [HttpPost("AutorizationUserAndGetToken")]
+        public async Task<ActionResult<Response>> AutorizationUserAndGetToken(Request request)
         {
-	        var identity = GetIdentity(email, password);
+	        var identity = GetIdentity(request.Email, request.Password);
 	        if (identity == null)
 	        {
 		        return BadRequest(new { errorText = "Invalid email or password." });
@@ -124,11 +149,11 @@ namespace ToDoListWeb.Controllers
 	        var now = DateTime.UtcNow;
 	        // создаем JWT-токен
 	        var jwt = new JwtSecurityToken(
-		        issuer: AuthOptions.ISSUER,
-		        audience: AuthOptions.AUDIENCE,
+		        issuer: AuthOptions.Issuer,
+		        audience: AuthOptions.Audience,
 		        notBefore: now,
 		        claims: identity.Claims,
-		        expires: now.Add(TimeSpan.FromMinutes(AuthOptions.LIFETIME)),
+		        expires: now.Add(TimeSpan.FromMinutes(AuthOptions.Lifetime)),
 		        signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
 	        var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
 
@@ -136,7 +161,7 @@ namespace ToDoListWeb.Controllers
 
 	        return (from user in users
 			        where user.Email == identity.Name
-			        select new Response {access_token = encodedJwt, username = identity.Name, idStudent = user.Id})
+			        select new Response {AccessToken = encodedJwt, Email = identity.Name, IdUser = user.Id})
 		        .FirstOrDefault();
         }
 
@@ -148,8 +173,8 @@ namespace ToDoListWeb.Controllers
 	        {
 		        user = elem;
 	        }
-
-	        if (user == null) return null;
+	        // если пользователя не найдено
+            if (user == null) return null;
 	        var claims = new List<Claim>
 	        {
 		        new Claim(ClaimsIdentity.DefaultNameClaimType, user.Email),
@@ -159,8 +184,6 @@ namespace ToDoListWeb.Controllers
 		        new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultNameClaimType,
 			        ClaimsIdentity.DefaultRoleClaimType);
 	        return claimsIdentity;
-
-	        // если пользователя не найдено
         }
 
         private bool UserExists(int id)

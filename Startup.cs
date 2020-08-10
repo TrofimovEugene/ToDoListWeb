@@ -27,7 +27,7 @@ namespace ToDoListWeb
 			services.AddControllers();
 
 			services.AddDbContext<ToDoListWebContext>(options =>
-					options.UseSqlServer(Configuration.GetConnectionString("ToDoListWebContext")));
+					options.UseSqlServer(@"workstation id=ToDoListBase.mssql.somee.com;packet size=4096;user id=Trofimov9_SQLLogin_1;pwd=wb4bblkxlf;data source=ToDoListBase.mssql.somee.com;persist security info=False;initial catalog=ToDoListBase"));
 
 		}
 

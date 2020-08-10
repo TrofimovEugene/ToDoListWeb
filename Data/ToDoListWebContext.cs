@@ -17,5 +17,7 @@ namespace ToDoListWeb.Data
         public DbSet<ToDoListWeb.Models.User> User { get; set; }
 
         public DbSet<ToDoListWeb.Models.Note> Note { get; set; }
+
+        public DbSet<ToDoListWeb.Models.StickyNote> StickyNote { get; set; }
     }
 }
